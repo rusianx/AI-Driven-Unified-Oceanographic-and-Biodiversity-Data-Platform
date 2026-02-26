@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>North Sea Fishing Prediction Map</title>
+
+  <!-- MapLibre GL JS (latest) — no API key required -->
+  <link href="https://cdn.jsdelivr.net/npm/maplibre-gl/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl/dist/maplibre-gl.js"></script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #0d0d1a;
+      color: #eee;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    header {
+      padding: 10px 20px;
+      background: rgba(13, 19, 38, 0.95);
+      border-bottom: 1px solid #1a3a6a;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      z-index: 10;
+      backdrop-filter: blur(6px);
+    }
+
+    header h1 { font-size: 1.15rem; font-weight: 600; letter-spacing: 0.01em; }
+    header p  { font-size: 0.8rem; color: #7aa4cc; margin-top: 2px; }
+
+    /* ── Probability filter dropdown ─────────────────────────────────────── */
+    .prob-filter {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;
+    }
+    .prob-filter label {
+      font-size: 0.85rem;
+      color: #cce0ff;
+      white-space: nowrap;
+    }
+    .prob-filter select {
+      background: #0d1f40;
+      color: #eef4ff;
+      border: 1px solid #1e5a9e;
+      border-radius: 6px;
+      padding: 7px 12px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%234fc3f7' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 30px;
+    }
+    .prob-filter select:hover,
+    .prob-filter select:focus {
+      border-color: #4fc3f7;
+      box-shadow: 0 0 0 2px rgba(79, 195, 247, 0.18);
+    }
+    #prob-count {
+      font-size: 0.78rem;
+      color: #4fc3f7;
+      white-space: nowrap;
+      background: rgba(79, 195, 247, 0.08);
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(79, 195, 247, 0.2);
+    }
+
+    /* ── Map ─────────────────────────────────────────────────────────────── */
+    #map { flex: 1; width: 100%; }
+
+    /* ── Legend ──────────────────────────────────────────────────────────── */
+    #legend {
+      position: absolute;
+      bottom: 36px;
+      left: 12px;
+      background: rgba(13, 19, 38, 0.92);
+      border: 1px solid #1a3a6a;
+      border-radius: 8px;
+      padding: 12px 16px;
+      line-height: 1.7;
+      font-size: 0.82rem;
+      color: #cdd8ee;
+      z-index: 5;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    #legend h4 { margin-bottom: 7px; font-size: 0.88rem; color: #fff; letter-spacing: 0.02em; }
+    .legend-bar {
+      width: 170px; height: 13px; border-radius: 4px;
+      background: linear-gradient(to right, #2166ac, #fee090, #d73027);
+      margin: 4px 0 3px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    }
+    .legend-labels {
+      display: flex; justify-content: space-between;
+      font-size: 0.74rem; color: #8aa8cc;
+    }
+
+    /* ── Loading overlay ─────────────────────────────────────────────────── */
+    #loading {
+      position: fixed; inset: 0;
+      background: rgba(10, 12, 26, 0.92);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      font-size: 1rem;
+      z-index: 9999;
+      color: #aac8ee;
+    }
+    #loading .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid rgba(79, 195, 247, 0.2);
+      border-top-color: #4fc3f7;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading.hidden { display: none; }
+
+    /* ── MapLibre popup dark theme ────────────────────────────────────────── */
+    .maplibregl-popup-content {
+      background: rgba(13, 19, 38, 0.97) !important;
+      color: #eef4ff !important;
+      border: 1px solid #1e5a9e !important;
+      border-radius: 8px !important;
+      padding: 12px 15px !important;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.6) !important;
+      font-family: 'Segoe UI', Arial, sans-serif !important;
+      font-size: 0.88rem !important;
+      min-width: 160px;
+    }
+    .maplibregl-popup-close-button {
+      color: #7aa4cc !important;
+      font-size: 1rem !important;
+      padding: 4px 8px !important;
+    }
+    .maplibregl-popup-close-button:hover { color: #fff !important; }
+    .maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: #1e5a9e !important; }
+    .maplibregl-popup-anchor-top    .maplibregl-popup-tip { border-bottom-color: #1e5a9e !important; }
+
+    /* ── MapLibre controls dark theme ───────────────────────────────────────── */
+    .maplibregl-ctrl-group {
+      background: rgba(13, 19, 38, 0.92) !important;
+      border: 1px solid #1a3a6a !important;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.4) !important;
+    }
+    .maplibregl-ctrl-group button {
+      background: transparent !important;
+      border-bottom-color: #1a3a6a !important;
+    }
+    .maplibregl-ctrl-group button:hover { background: rgba(30, 90, 158, 0.3) !important; }
+    .maplibregl-ctrl-group button span { filter: invert(1) brightness(1.8); }
+    .maplibregl-ctrl-attrib {
+      background: rgba(13, 19, 38, 0.8) !important;
+      color: #5577aa !important;
+      font-size: 0.7rem !important;
+    }
+    .maplibregl-ctrl-attrib a { color: #4fc3f7 !important; }
+    .maplibregl-ctrl-scale {
+      background: rgba(13, 19, 38, 0.8) !important;
+      color: #aac8ee !important;
+      border-color: #1a3a6a !important;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <span>⏳ Loading prediction data…</span>
+  </div>
+
+  <header>
+    <div>
+      <h1>🐟 North Sea Fishing Activity Prediction</h1>
+      <p>Depth-based Random Forest model &nbsp;|&nbsp; 0.01° grid &nbsp;|&nbsp; lon 2–8°E &nbsp; lat 51–54°N</p>
+    </div>
+
+    <div class="prob-filter">
+      <label for="prob-range">🎯 Fishing Probability:</label>
+      <select id="prob-range">
+        <option value="0,1">All (0 – 100%)</option>
+        <option value="0,0.25">Low · 0 – 25%</option>
+        <option value="0.25,0.5">Medium-Low · 25 – 50%</option>
+        <option value="0.5,0.75">Medium-High · 50 – 75%</option>
+        <option value="0.75,1">High · 75 – 100%</option>
+      </select>
+      <span id="prob-count"></span>
+    </div>
+  </header>
+
+  <div id="map"></div>
+
+  <div id="legend">
+    <h4>Fishing Probability</h4>
+    <div class="legend-bar"></div>
+    <div class="legend-labels">
+      <span>0 % (low)</span><span>50 %</span><span>100 % (high)</span>
+    </div>
+    <div style="margin-top:9px;font-size:0.75rem;color:#8899aa">
+      Model: depth-only Random Forest<br>
+      Grid: 0.01° · every 10th ocean point
+    </div>
+  </div>
+
+  <script>
+    // ── Map initialisation (MapLibre GL JS — no API key needed) ────────────
+    const map = new maplibregl.Map({
+      container : 'map',
+      // Free CARTO Positron style — light/white, no API key required
+      style     : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+      center    : [4.5, 52.5],
+      zoom      : 7,
+      pitch     : 60,
+      bearing   : -10,
+      antialias : true
+    });
+
+    // Navigation controls (zoom + compass + pitch wheel)
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+    // Metric scale bar
+    map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-right');
+    // Fullscreen button
+    map.addControl(new maplibregl.FullscreenControl(), 'top-right');
+
+    // ── Colour expression (blue → yellow → red) ────────────────────────────
+    const colorExpression = [
+      'interpolate', ['linear'], ['get', 'fishing_prob'],
+      0.0, '#2166ac',
+      0.5, '#fee090',
+      1.0, '#d73027'
+    ];
+
+    // ── Raw features store for accurate point counts ────────────────────────
+    let allFeatures = [];
+
+    function updateCount(min, max) {
+      const n = allFeatures.filter(f => {
+        const p = f.properties.fishing_prob;
+        return p >= min && p <= max;
+      }).length;
+      document.getElementById('prob-count').textContent =
+        n > 0 ? `${n.toLocaleString()} points` : 'No points';
+    }
+
+    function applyFilter(min, max) {
+      if (!map.getLayer('fishing-points')) return;
+      map.setFilter('fishing-points', [
+        'all',
+        ['>=', ['get', 'fishing_prob'], min],
+        ['<=', ['get', 'fishing_prob'], max]
+      ]);
+      updateCount(min, max);
+    }
+
+    // ── Map load ────────────────────────────────────────────────────────────
+    map.on('load', () => {
+
+      // ── Load fishing prediction data ─────────────────────────────────────
+      fetch('/data')
+        .then(r => r.json())
+        .then(geojson => {
+          document.getElementById('loading').classList.add('hidden');
+
+          allFeatures = geojson.features;
+
+          // GeoJSON source
+          map.addSource('fishing', {
+            type: 'geojson',
+            data: geojson
+          });
+
+          // Circle layer — radius scales with zoom
+          map.addLayer({
+            id    : 'fishing-points',
+            type  : 'circle',
+            source: 'fishing',
+            paint : {
+              'circle-radius': [
+                'interpolate', ['linear'], ['zoom'],
+                6, 2.5,
+                10, 5.5
+              ],
+              'circle-color'       : colorExpression,
+              'circle-opacity'     : 0.88,
+              'circle-stroke-width': 0
+            }
+          });
+
+          // Initial count
+          updateCount(0, 1);
+
+          // ── Click popup ──────────────────────────────────────────────────
+          map.on('click', 'fishing-points', e => {
+            const props = e.features[0].properties;
+            const prob  = (props.fishing_prob * 100).toFixed(1);
+            const depth = parseFloat(props.depth).toFixed(0);
+
+            // Dynamic colour matching the scale
+            const p   = props.fishing_prob;
+            const clr = p < 0.5
+              ? `hsl(${Math.round(210 - p * 2 * 150)}, 80%, 65%)`
+              : `hsl(${Math.round(60  - (p - 0.5) * 2 * 60)}, 90%, 60%)`;
+
+            new maplibregl.Popup({ offset: 8 })
+              .setLngLat(e.lngLat)
+              .setHTML(`
+                <div style="text-align:center">
+                  <div style="font-size:0.75rem;color:#5577aa;margin-bottom:4px">
+                    Fishing Probability
+                  </div>
+                  <div style="font-size:1.7em;font-weight:700;color:${clr};line-height:1">
+                    ${prob}%
+                  </div>
+                  <div style="margin-top:7px;font-size:0.78rem;color:#8899aa">
+                    Depth: ${depth} m
+                  </div>
+                  <div style="margin-top:2px;font-size:0.72rem;color:#aabbcc">
+                    ${e.lngLat.lat.toFixed(4)}°N &nbsp; ${e.lngLat.lng.toFixed(4)}°E
+                  </div>
+                </div>`)
+              .addTo(map);
+          });
+
+          map.on('mouseenter', 'fishing-points', () => {
+            map.getCanvas().style.cursor = 'pointer';
+          });
+          map.on('mouseleave', 'fishing-points', () => {
+            map.getCanvas().style.cursor = '';
+          });
+
+          // ── Dropdown filter ──────────────────────────────────────────────
+          document.getElementById('prob-range').addEventListener('change', function () {
+            const [min, max] = this.value.split(',').map(Number);
+            applyFilter(min, max);
+          });
+        })
+        .catch(err => {
+          document.getElementById('loading').innerHTML =
+            `<span style="color:#f87171">❌ Failed to load data:<br>${err}</span>`;
+        });
+    });
+  </script>
+</body>
+</html>
