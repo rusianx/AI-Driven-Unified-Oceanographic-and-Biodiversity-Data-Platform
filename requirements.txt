@@ -1,0 +1,10 @@
+pandas
+numpy
+matplotlib
+statsmodels
+pmdarima
+scikit-learn
+tensorflow
+
+#pip install streamlit pandas numpy matplotlib statsmodels pmdarima tensorflow scikit-learn
+# cd D:\TimeSeriesProject\Data\streamlit run forecasting.py 
