@@ -1,0 +1,51 @@
+.dataset-selector{/* dataset selector styles */}
+/* selector styles */
+
+.dataset-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.dataset-selector-label {
+  font-size: 0.9em;
+  color: rgba(138, 180, 248, 0.9);
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+.dataset-selector-dropdown {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  background: rgba(10, 25, 41, 0.9);
+  color: #8ab4f8;
+  border: 1px solid rgba(138, 180, 248, 0.3);
+  border-radius: 6px;
+  font-size: 0.95em;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.dataset-selector-dropdown:hover:not(:disabled) {
+  background: rgba(15, 35, 55, 0.95);
+  border-color: rgba(138, 180, 248, 0.5);
+}
+
+.dataset-selector-dropdown:focus {
+  border-color: rgba(138, 180, 248, 0.8);
+  box-shadow: 0 0 0 3px rgba(138, 180, 248, 0.1);
+}
+
+.dataset-selector-dropdown:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dataset-selector-dropdown option {
+  background: rgba(10, 25, 41, 0.98);
+  color: #8ab4f8;
+  padding: 0.5rem;
+}
